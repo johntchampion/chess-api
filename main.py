@@ -28,6 +28,7 @@ app.add_middleware(
 class MoveSuggestionBody(BaseModel):
     fen: str
     skill_level: int = 10
+    elo_level: int | None = None
 
 
 @app.get('/', tags=['Default'])
@@ -41,14 +42,30 @@ def index():
 @app.post('/suggest-move', tags=['Chess Engine'])
 def test_chess_engine(body: MoveSuggestionBody):
     """
-    Suggests a move given a chess game and skill level. The game state is expected to
-    be a FEN string, and the skill level is an integer between 0 and 20 inclusive.
+    Suggests a move given a chess game and skill level.
+
+    **Body Parameters**
+    - `fen` (string, required): The current board state in FEN notation.
+    - `skill_level` (integer, optional): Engine strength from 0 (weakest) to 20 (strongest). Defaults to 10.
+    - `elo_level` (integer, optional): Target ELO rating for the engine. When provided, takes precedence over `skill_level`.
+
+    **Response**
+    - `best_move` (string): The recommended move in UCI notation (e.g. `e2e4`), or `null` if no legal move is available.
     """
     STOCKFISH_PATH = os.getenv('STOCKFISH_PATH') or 'stockfish'
 
-    stockfish = Stockfish(path=STOCKFISH_PATH)
+    stockfish = Stockfish(
+        path=STOCKFISH_PATH,
+        parameters={
+            "Threads": 2, 
+            "Hash": 256,
+            "Skill Level": body.skill_level})
+    
+    if body.elo_level:
+        # ELO takes precident over skill level if LimitStrength is True
+        stockfish.update_engine_parameters({"UCI_LimitStrength": True, "UCI_Elo": body.elo_level})
+
     stockfish.set_fen_position(body.fen)
-    stockfish.set_skill_level(body.skill_level)
     best_move = stockfish.get_best_move()
 
     return {'best_move': best_move}

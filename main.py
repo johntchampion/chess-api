@@ -56,10 +56,7 @@ def test_chess_engine(body: MoveSuggestionBody):
 
     stockfish = Stockfish(
         path=STOCKFISH_PATH,
-        parameters={
-            "Threads": 2, 
-            "Hash": 256,
-            "Skill Level": body.skill_level})
+        parameters={"Skill Level": body.skill_level})
     
     if body.elo_level:
         # ELO takes precident over skill level if LimitStrength is True

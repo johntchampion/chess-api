@@ -1,7 +1,7 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from stockfish import Stockfish
 
 DESCRIPTION = """
@@ -29,6 +29,7 @@ class MoveSuggestionBody(BaseModel):
     fen: str
     skill_level: int = 10
     elo_level: int | None = None
+    think_time_ms: int = Field(default=1000, ge=50, le=5000)
 
 
 @app.get('/', tags=['Default'])
@@ -48,6 +49,7 @@ def test_chess_engine(body: MoveSuggestionBody):
     - `fen` (string, required): The current board state in FEN notation.
     - `skill_level` (integer, optional): Engine strength from 0 (weakest) to 20 (strongest). Defaults to 10.
     - `elo_level` (integer, optional): Target ELO rating for the engine. When provided, takes precedence over `skill_level`.
+    - `think_time_ms` (integer, optional): Time in milliseconds Stockfish is allowed to think. Min 50, max 5000. Defaults to 1000.
 
     **Response**
     - `best_move` (string): The recommended move in UCI notation (e.g. `e2e4`), or `null` if no legal move is available.
@@ -56,13 +58,13 @@ def test_chess_engine(body: MoveSuggestionBody):
 
     stockfish = Stockfish(
         path=STOCKFISH_PATH,
-        parameters={"Skill Level": body.skill_level})
+        parameters={"Skill Level": body.skill_level, "Threads": 1})
     
     if body.elo_level:
         # ELO takes precident over skill level if LimitStrength is True
         stockfish.update_engine_parameters({"UCI_LimitStrength": True, "UCI_Elo": body.elo_level})
 
     stockfish.set_fen_position(body.fen)
-    best_move = stockfish.get_best_move()
+    best_move = stockfish.get_best_move_time(body.think_time_ms)
 
     return {'best_move': best_move}
